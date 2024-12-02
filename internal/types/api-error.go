@@ -1,6 +1,9 @@
 package types
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type APIError struct {
 	Code          int    `json:"code"`
@@ -16,6 +19,26 @@ func (e *APIError) Error() string {
 	}
 
 	return retStr
+}
+
+// MarshalJSON implements a custom way for marshaling the API Error type
+func (e *APIError) MarshalJSON() ([]byte, error) {
+	type Alias APIError // Avoid recursion by using an alias type
+	return json.Marshal(&struct {
+		*Alias
+		EmbeddedError string `json:"embeddedError"`
+	}{
+		Alias:         (*Alias)(e),
+		EmbeddedError: e.getEmbeddedError(),
+	})
+}
+
+// Helper to unwrap the error chain into a string
+func (e *APIError) getEmbeddedError() string {
+	if e.EmbeddedError == nil {
+		return ""
+	}
+	return e.EmbeddedError.Error()
 }
 
 func FormatOperation(method, path string) string {

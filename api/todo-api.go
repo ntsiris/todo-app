@@ -2,12 +2,14 @@ package api
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+
 	"github.com/ntsiris/todo-app/internal/service"
 	"github.com/ntsiris/todo-app/internal/store"
 	"github.com/ntsiris/todo-app/internal/types"
 	"github.com/ntsiris/todo-app/internal/utils"
-	"net/http"
-	"strconv"
 )
 
 type TodoHandler struct {
@@ -19,7 +21,9 @@ type apiFunc func(w http.ResponseWriter, r *http.Request) error
 func makeHTTPHandleFunc(f apiFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := f(w, r); err != nil {
-			_ = utils.WriteJSON(w, err.(*types.APIError).Code, err)
+			if err := utils.WriteJSON(w, err.(*types.APIError).Code, err); err != nil {
+				log.Printf("failed to write json: " + err.Error())
+			}
 		}
 	}
 }
@@ -112,8 +116,8 @@ func (handler *TodoHandler) handleUpdate(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Get the updated item from the request
-	updatedItem := service.Item{}
-	if err = utils.ParseJSON(r, &updatedItem); err != nil {
+	updatedItem := &service.Item{}
+	if err = utils.ParseJSON(r, updatedItem); err != nil {
 		return &types.APIError{
 			Code:          http.StatusBadRequest,
 			Message:       "Invalid request format",
@@ -123,7 +127,7 @@ func (handler *TodoHandler) handleUpdate(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Update the item to the store
-	if err = handler.Update(id, &updatedItem); err != nil {
+	if updatedItem, err = handler.Update(id, updatedItem); err != nil {
 		return &types.APIError{
 			Code:          http.StatusInternalServerError,
 			Message:       "Failed to update item",
@@ -146,7 +150,7 @@ func (handler *TodoHandler) handleDelete(w http.ResponseWriter, r *http.Request)
 		return err
 	}
 
-	err = handler.Delete(item)
+	err = handler.Delete(item.Id)
 	if err != nil {
 		return &types.APIError{
 			Code:          http.StatusInternalServerError,
@@ -183,11 +187,11 @@ func (handler *TodoHandler) handleSearch(w http.ResponseWriter, r *http.Request)
 	return utils.WriteJSON(w, http.StatusOK, results)
 }
 
-func (handler *TodoHandler) retrieveItem(r *http.Request, id int) (service.Item, error) {
+func (handler *TodoHandler) retrieveItem(r *http.Request, id int) (*service.Item, error) {
 
 	item, err := handler.Get(id)
 	if err != nil {
-		return service.Item{}, &types.APIError{
+		return nil, &types.APIError{
 			Code:          http.StatusNotFound,
 			Message:       fmt.Sprintf("failed to retrieve item with id %v", id),
 			Operation:     types.FormatOperation(r.Method, r.URL.Path),
@@ -195,7 +199,7 @@ func (handler *TodoHandler) retrieveItem(r *http.Request, id int) (service.Item,
 		}
 	}
 
-	return *item, nil
+	return item, nil
 }
 
 func parseIntPathValue(r *http.Request, key string) (int, error) {
