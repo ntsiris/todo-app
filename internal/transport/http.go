@@ -2,9 +2,11 @@ package transport
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+
 	"github.com/ntsiris/todo-app/api"
 	"github.com/ntsiris/todo-app/internal/store"
-	"net/http"
 )
 
 type APIServer struct {
@@ -12,10 +14,15 @@ type APIServer struct {
 	store store.Store
 }
 
-func NewAPIServer(address string, store store.Store) *APIServer {
+type APIServerConfig struct {
+	Host string `envconfig:"API_SERVER_HOST" default:"localhost"`
+	Port int    `envconfig:"API_SERVER_PORT" default:"8080"`
+}
+
+func NewAPIServer(config *APIServerConfig, store store.Store) *APIServer {
 	return &APIServer{
 		Server: &http.Server{
-			Addr: address,
+			Addr: fmt.Sprintf("%s:%d", config.Host, config.Port),
 		},
 		store: store,
 	}
