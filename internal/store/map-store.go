@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+
 	"github.com/ntsiris/todo-app/internal/service"
 )
 
@@ -10,16 +11,19 @@ const defaultCapacity = 100
 
 type MapStore struct {
 	storage map[int]service.Item
+	lastID  int
 }
 
 func NewMapStore() *MapStore {
 	return &MapStore{
 		storage: nil,
+		lastID:  0,
 	}
 }
 
 func (m *MapStore) Add(item *service.Item) error {
-	m.storage[item.Id] = *item
+	m.storage[m.lastID] = *item
+	m.lastID++
 	return nil
 }
 
@@ -32,14 +36,14 @@ func (m *MapStore) Get(id int) (*service.Item, error) {
 	return &item, nil
 }
 
-func (m *MapStore) GetAll() (*[]service.Item, error) {
-	items := make([]service.Item, 0, len(m.storage))
+func (m *MapStore) GetAll() ([]*service.Item, error) {
+	items := make([]*service.Item, 0, len(m.storage))
 
 	for _, item := range m.storage {
-		items = append(items, item)
+		items = append(items, &item)
 	}
 
-	return &items, nil
+	return items, nil
 }
 
 func (m *MapStore) Update(id int, updatedItem *service.Item) error {
@@ -52,15 +56,12 @@ func (m *MapStore) Update(id int, updatedItem *service.Item) error {
 	return nil
 }
 
-func (m *MapStore) Delete(item *service.Item) error {
-	for id, toDel := range m.storage {
-		if toDel == *item {
-			delete(m.storage, id)
-			return nil
-		}
+func (m *MapStore) Delete(id int) error {
+	if _, ok := m.storage[id]; !ok {
+		return errors.New("could not delete item, item not found")
 	}
-
-	return errors.New("item not found")
+	delete(m.storage, id)
+	return nil
 }
 
 func (m *MapStore) Open() error {
